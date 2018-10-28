@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 2
+  tags:
+  - Phone
+  - TorpedoLoaderTubeLever
+  - Table
+  - PressurizedTubeSlider
+  - Hatch
+  - HatchLever
+  - Player1
+  - Player2
+  - Objectives
+  - SubmarineHealth
+  - skip
+  - PauseMenu
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+  - 
+  - Water
+  - UI
+  - 
+  - 
+  - player
+  - Interactables
+  - FloodWater
+  - Torpedo
+  - Holdables
+  - Tube
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  m_SortingLayers:
+  - name: Default
+    uniqueID: 0
+    locked: 0
+  - name: Interactable
+    uniqueID: 3279103941
+    locked: 0
+  - name: Players
+    uniqueID: 1092410815
+    locked: 0
