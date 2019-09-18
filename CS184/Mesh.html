@@ -1,0 +1,272 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>CS 184 Mesh Editor</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+
+
+<body>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2019</h1>
+<h1 align="middle">Project 2: Mesh Editor</h1>
+<h2 align="middle">Christopher Yun</h2>
+
+<br><br>
+
+<div>
+
+<h2 align="middle">Overview</h2>
+<p>We created shapes and different objects by first calculating Bezier curves. Using de Casteljau's algorithm we created curves and straight surfaces to model objects. We do this 
+    by first calculating Bezier curves, and then surfaces using 1D de casteljau's algorithm which interpolates between Bezier curves. We then calculate the average normals for each 
+    vertex and therefore improve our shading. We then implement flip and split edge which reassigns the pointers in a pair of triangles so that we flip sections of our images 
+    and then split these same sections into various sections. We do all this by reassigning halfedges, faces, vertices, and edges and creating new ones where appropriate, We then 
+    implement Loop subdivision for upsampling.</p>
+
+<h2 align="middle">Section I: Bezier Curves and Surfaces</h2>
+
+<h3 align="middle">Part 1: Bezier curves with 1D de Casteljau subdivision</h3>
+
+<p>We implement de Casteljau's algorithm is a form of inserting points using linear interpolation and creating a "cage" which is used to then create the Bezier curve. 
+    We implement this algorithm by linearly inrerpolating the location of new vertices on the lines between the original connecting points by taking each pair of points linearly 
+    interpolating a t value between them. The default t value is 0.5. We find the new vertices on these new lines, and each time we have one less line. We keep going until 
+    we have one line and put our last vertex on the calculated area on that line. We then use the best fitting vertices on the "cage" to create our Bezier curve.</p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p1i1.png" align="middle" width="400px"/>
+        <figcaption align="middle">Initial control points.</figcaption>
+      </td>
+      <td>
+        <img src="images/p1i2.png" align="middle" width="400px"/>
+        <figcaption align="middle">First interpolation.</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr>
+      <td>
+        <img src="images/p1i3.png" align="middle" width="400px"/>
+        <figcaption align="middle">Second level interpolation.</figcaption>
+      </td>
+      <td>
+        <img src="images/p1i4.png" align="middle" width="400px"/>
+        <figcaption align="middle">Next level interpolation.</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr>
+      <td>
+        <img src="images/p1i5.png" align="middle" width="400px"/>
+        <figcaption align="middle">Next level interpolation.</figcaption>
+      </td>
+      <td>
+        <img src="images/p1i6.png" align="middle" width="400px"/>
+        <figcaption align="middle">Final interpolation..</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr>
+      <td>
+        <img src="images/p1i7.png" align="middle" width="400px"/>
+        <figcaption align="middle">Bezier Curve with default t.</figcaption>
+      </td>
+      <td>
+        <img src="images/p1i8.png" align="middle" width="400px"/>
+        <figcaption align="middle">Bezier Curve with new t.</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+
+
+<h3 align="middle">Part 2: Bezier surfaces with separable 1D de Casteljau subdivision</h3>
+
+<p>Bezier surfaces can have de Casteljau's algorithm applied to them. We have 4 bezier curves, and each is made of 4 points. We do the algorithm from part 1 on each row of the 
+    individual lines, and we then apply de Casteljau's algorithm on the 4 new points we have calculated.</p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p2i1.png" align="middle" width="400px"/>
+        <figcaption align="middle">Rendering teapot from bez.</figcaption>
+      </td>
+    <tr>
+  </table>
+</div>
+
+<h2 align="middle">Section II: Sampling</h2>
+
+<h3 align="middle">Part 3: Average normals for half-edge meshes</h3>
+
+<p>We approximate unit normal at every vertex by computing the area-weighted average of the normals of neighboring triangles. We then normalize this value and 
+    these values are used to help in shading since we shade average points and not at vertices on triangles.
+<p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p3i1.png" align="middle" width="400px"/>
+        <figcaption align="middle">Face normals.</figcaption>
+      </td>
+      <td>
+        <img src="images/p3i2.png" align="middle" width="400px"/>
+        <figcaption align="middle">Average Vertex normals.</figcaption>
+      </td>
+    <tr>
+  </table>
+</div>
+<h3 align="middle">Part 4: Half-edge flip</h3>
+
+<p>In my head for flip edge, I saw the halfedges with respect to their triangles "turn" 90 degrees clockwise. The edge we are flipping has its vertices reassigned, the halfedges on the outside 
+    have their twins changed, all the halfedges on the inside have their pointers reassigned (regardless if their pointer values changes), and eventually we end up with a "turned" 
+    represnetation of all the half edges while the vertices and halfedges on the outside of the triangles do not "turn". Oh my, my debugging journey was so painful. I implemented 
+    everything correctly besides my outside halfedges. My outside halfedges I thought pointed to the faces on the inside of the triangles; I forgot they were halfedges for other 
+    triangles. I did not realize this until about 5 hours of debugging, and I wanted to die a swift death.</p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p4i1.png" align="middle" width="400px"/>
+        <figcaption align="middle">Normal cube edge.</figcaption>
+      </td>
+      <td>
+        <img src="images/p4i2.png" align="middle" width="400px"/>
+        <figcaption align="middle">Flipped cube edge.</figcaption>
+      </td>
+    <tr>
+    <br>
+      <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p4i3.png" align="middle" width="400px"/>
+        <figcaption align="middle">Normal cube.</figcaption>
+      </td>
+      <td>
+        <img src="images/p4i4.png" align="middle" width="400px"/>
+        <figcaption align="middle">Flipped top right edge or previous image.</figcaption>
+      </td>
+    <tr>
+  </table>
+</div>
+
+<h3 align="middle">Part 5: Half-edge split</h3>
+
+<p>For part 5 I created 3 new edges, 6 new halfedges, 2 new faces, and 1 new vertex. Instead of "turning" this time like in the previous problem, we left the top left, top right, bottom left, 
+    and bottom right the same in terms of positioning, and we reassigned pointers as we moved the original edge, e0, "up" and created the 3 new edges as the left, right, and bottom edges 
+    inside the 2 original triangles. We then create and assign the new halfedges, edges, faces, and vertex and reassign the existing ones around these.</p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p5i1.png" align="middle" width="400px"/>
+        <figcaption align="middle">Normal cube edge.</figcaption>
+      </td>
+      <td>
+        <img src="images/p5i2.png" align="middle" width="400px"/>
+        <figcaption align="middle">Split cube edge.</figcaption>
+      </td>
+    <tr>
+    <br>
+      <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p5i3.png" align="middle" width="400px"/>
+        <figcaption align="middle">Normal cube edges.</figcaption>
+      </td>
+      <td>
+        <img src="images/p5i4.png" align="middle" width="400px"/>
+        <figcaption align="middle">Split and flipped cube edges.</figcaption>
+      </td>
+    <tr>
+  </table>
+</div>
+
+<h3 align="middle">Part 6: Loop subdivision for mesh upsampling</h3>
+
+<p>
+    For loop subdivision, we first iterate through every vertex of the original mesh and calculate it's new averaged position using the formula "(1 - n*u) * original_position + u * neighbor_position_sum", putting 
+    the new position in vertex->newPosition. We then calculate the new vertex positions for vertices at midpoints of edges using 
+    "3/8 * (A + B) + 1/8 * (C + D)" and put them in edge->newPosition. Using a copy of the original edges, we iterate through and split the edges. We then flip any new edge that 
+    is connected to an old and new vertex. We finally, for every vertex v, do v->position = v->newPosition</p>
+
+<p>Sharp corners and edges are smoothed out because we upsample according to vertice connections, and to achieve a symmetric shape, at least for a cube, we need to split the edge 
+    on the face of each side of the cube. Pre-splitting keeps flatter edges (even though these eventually smooth out as well) and by pre-splitting the face edges we keep a symmetric 
+    form around the cube.<p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p6i1.png" align="middle" width="400px"/>
+        <figcaption align="middle">Normal cube.</figcaption>
+      </td>
+      <td>
+        <img src="images/p6i2.png" align="middle" width="400px"/>
+        <figcaption align="middle">Normal cube upsampled once</figcaption>
+      </td>
+    <tr>
+    <br />
+    <tr>
+      <td>
+        <img src="images/p6i3.png" align="middle" width="400px"/>
+        <figcaption align="middle">Normal cube upsampled twice.</figcaption>
+      </td>
+        <td>
+            <img src="images/p6i4.png" align="middle" width="400px" />
+            <figcaption align="middle">Normal cube upsampled thrice.</figcaption>
+        </td>
+    <tr>
+    <br>
+      <tr>
+        <td>
+            <img src="images/p6i5.png" align="middle" width="400px" />
+            <figcaption align="middle">Cube with all face edges split.</figcaption>
+        </td>
+        <td>
+            <img src="images/p6i6.png" align="middle" width="400px" />
+            <figcaption align="middle">Split/symmetric cube upsampled once.</figcaption>
+        </td>
+    </tr><tr>
+    <br>
+      <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p6i7.png" align="middle" width="400px"/>
+        <figcaption align="middle">Split/symmetric cube upsampled twice</figcaption>
+      </td>
+      <td>
+        <img src="images/p6i8.png" align="middle" width="400px"/>
+        <figcaption align="middle">Split/symmetric cube upsampled thrice.</figcaption>
+      </td>
+    <tr>
+  </table>
+</div>
+
+<h2 align="middle">Section III: Mesh Competition</h2>
+<p>If you are not participating in the optional mesh competition, don't worry about this section!</p>
+
+<h3 align="middle">Part 7: Design your own mesh!</h3>
+
+</body>
+</html>

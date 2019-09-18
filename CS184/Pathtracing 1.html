@@ -1,0 +1,283 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>  
+    div.padded {  
+      padding-top: 0px;  
+      padding-right: 100px;  
+      padding-bottom: 0.25in;  
+      padding-left: 100px;  
+    }  
+  </style> 
+<title>Your Name  |  CS 184</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" href="style.css" media="screen" />
+</head>
+<body>
+<br />
+<h1 align="middle">Assignment 3: PathTracer</h1>
+    <h2 align="middle">Your Name</h2>
+
+    <div class="padded">
+        <p>Use this section to write an overview of the assignment. All of the text in your write-up should be <em>in your own words</em>. If you need to add additional HTML features to this document, you can search the <a href="http://www.w3schools.com/">http://www.w3schools.com/</a> website for instructions. To edit the HTML, you can just copy and paste existing chunks and fill in the text and image file names appropriately.</p>
+        <o>The website writeup is intended to be a self-contained walkthrough of the assignment: we want this to be a piece of work which showcases your understanding of relevant concepts through both mesh images as well as written explanations about what you did to complete each part of the assignment. Try to be as clear and organized as possible when writing about your own output files or extensions to the assignment. We want to understand what you've achieved and how you've done it!</p> 
+        <p>If you are well-versed in web development, feel free to ditch this template and make a better looking page. Just make sure that you include all the components as we've laid them out here. </p>
+
+    <h2 align="middle">Part 1: Ray Generation and Intersection</h2>
+        <p>In order to generate a ray, we start at the camera's position, looking down the -z axis. We are given an x and y coordinate in the generate_ray 
+            function and we then take these and convert them to 3D coordinates in world space. Our hFOV and vFOV have a window of things we can see, and we find the top 
+            right and bottom left corners of the screen using these two. We then interpolate between these two using the x and y coordinates to find the position in camera 
+            space. After, we apply c2w to find the vector in the world space. We now shoot our ray using the vector in world space (after normalizing) and the camera as an 
+            origin.</p>
+        <p>In order to find if our ray is interecting a triangle, we calculate the barycentric coordinates of the triangle as well as the time at which 
+            we would hit the triangle using the Moller Trumbore Algorithm. If any of the barycentric coordiantes are greater than or less than one we do not 
+            have our ray hitting inside the triangle. If t is less than the min or greater than the max t of the ray, we know the ray cannot reach this location. So 
+            after we know if we hit the triangle, we want to set up the primitive of the intersection as well as the BSDF and normal (barycentric coordinates with normals) to correctly calculate how the ray 
+            affects our intersection. The same concepts of checking intersection are applied to spheres except we check the deterimant of the quadratic formula to see if we have 2 points of 
+            intersection (determinant > 0). The normal is finding the vector between the origin of the sphere and the hitpoint, but besides this triangle and sphere 
+            intersection are very similar.<p>
+        <div align="center">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                        <img src="images/part11.png" width="480px" />
+                        <figcaption align="middle">CBgems</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/part12.png" width="480px" />
+                        <figcaption align="middle">CBempty</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/part13.png" width="480px" />
+                        <figcaption align="middle">CBspheres</figcaption>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <h2 align="middle">Part 2 Bounding Volume Hierarchy</h2>
+            <p>To construct my Bounding Box, I first get all the primitives and expand an empty BBox until it includes all the primitives. I then create a node. I then check to see 
+                if the number of primitives is less than the max_leaf_size, if so I make a node with its primitives set to these primitives and return the node. Next 
+                I find the maximum axis to split on by comparing all the x,y, and z axis' of the extent. To calculate my splitpoint to split up my primitives, I 
+                average the centroids of the primitives, and for each primitive if its primitive is less than the splitpoint it is put into a vector called left and 
+                if it is greater it is put into a vector called right. If either vector is empty I pop the back of the other and add it onto the empty vector. I then 
+                recursively set the left and right nodes of the node I created and return that node.<p>
+            <p>For my BVH Intersect function, I check if the given ray intersects the given node's bbox. I set t0 to be the given ray's min_t, and I set t1 to be 
+                the given ray's max_t, since these values will change when calling intersect. If the ray does not intersect we return false. Otherwise we then 
+                check if either the t0 and t1 (now changed) are less than the ray's min or greater than the ray's max t and return false if they are. We then go on 
+                and if a node is a leaf we check if any of its primitives intersect with the ray and return true if we do, but we go through every primitive. If it is not 
+                a leaf we recursively check if the node's left and right children have intersections and return true if either does. Otherwise we return false at the very 
+                end.<p>
+            <p>I rendered cow.dae before and after implementing part 2, and the first took about 4 minutes and 40 ish seconds and the later takes about 
+                1 - 2 seconds to fully render. The BVH restricts the space that we test for rendering and since our algorithm is recursively looping over an area 
+                that is much larger without a BVH, it takes exponentially longer. We also have new intersect functions in bvh.cpp that check if the bbox is intersected first 
+                so this helps assist in the speedup. Overall, having a bbox makes things better and does not seem to slow down or detriment the rendering process in any 
+                meaningful way.<p>
+            <div align="center">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                        <img src="images/part21.png" width="480px" />
+                        <figcaption align="middle">maxplanck</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/part22.png" width="480px" />
+                        <figcaption align="middle">beast</figcaption>
+                    </td>
+                </tr>
+            </table>
+        </div>
+            
+        <h2 align="middle">Part 3 Direct Illumination</h2>
+            <p>My estimate_direct_lighting_hemisphere function runs like this. Imagine we have a surface a ray interacts with, and we have a hemisphere around 
+                this point that we use to determine direct lighting. We take as many samples as num_samples and for each sample, we declare a new Intersection and 
+                calculate the wi, or direction of the ray by calling get_sample function. We then calculate the direction of the ray in world space, called wi_world, since we have 
+                operated in a local coordinate space. We then generate a ray with an origin slightly offset from the hit point by a global constant called EPS_d 
+                multiplied by our wi_world, and the direction as wi_world. If the ray intersects our BVH we call get_emission and multiply it by the bsdf of the original given Intersection and 
+                by the angle (wi.z or cos_theta(wi)) and finally weight this whole thing by the pdf (divide by pdf) which is always 1 / 2Pi since we are working with 
+                a hemisphere. We accumulate this result from a single sample in L_out and do this for all samples.<p>
+            <p>For my estimate_direct_lighting_importance, we sample only the lights rather than uniformly in a sphere to estimate the lighting from this intersection. 
+                First we iterate over every light in the scene, and we check if they are a delta_light, aka point light. If so we call sample_L and get back a wi (direction of ray), 
+                distance to light, and pdf. We calculate the rays direction in object space (w_in). If w_in.z is less than 0 we just continue the loop because we know the 
+                light is behind the surface, if not we create a ray with origin at the hit point offset by wi * EPS_D and the direction as wi. The ray's max_t is 
+                set to the distance to the light since we do not care for anything beyond this. If the ray does not intersect the scene, we want to calculate the same result as we 
+                did in the previous part (emission * bsdf * w_in.z / pdf) and accumulate it in L_out. Note, our pdf is not 1 / 2Pi this time and it is calculated by 
+                sample_L. We do the same exact process if the light is not a delta_light, except we keep a running sum and take as many samples as there 
+                are area lights. Before we accumulate in L_out we divide the running sum by the number of area lights, or the number of samples we took.<p>
+            <p>Using direct hemisphere lighting vs direct importance lighting leads to very different results. Using hemisphere leads to much noisier results and we need 
+                more samples per pixel to achieve similar results. This trend is unviersal across the board, and images with point lights do not appear as clear with hemisphere 
+                lighting since rays do not necessarily directly intersect. By sampling over every light and still lighting points without direct intersection 
+                leads to better results. Comparing the sphere images we can see that the importance image has less black spots, aka noise, and our images appear to be 
+                more natural and generally look better.<p>
+            <div align="center">
+                <table style="width=100%">
+                    <tr>
+                        <td align="middle">
+                            <img src="images/CBbunny_64_32_hem.png" width="480px" />
+                            <figcaption align="middle">Bunny with direct hemisphere lighting.</figcaption>
+                        </td>
+                        <td align="middle">
+                            <img src="images/CBbunny_64_32_importance.png" width="480px" />
+                            <figcaption align="middle">Bunny with direct importance lighting.</figcaption>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="middle">
+                            <img src="images/CBspheres_64_32_hem.png" width="480px" />
+                            <figcaption align="middle">Spheres with direct hemisphere lighting.</figcaption>
+                        </td>
+                        <td align="middle">
+                            <img src="images/CBspheres_64_32_importance.png" width="480px" />
+                            <figcaption align="middle">Spheres with direct importance lighting.</figcaption>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="middle">
+                            <img src="images/CBbunny_1_1_p3.png" width="480px" />
+                            <figcaption align="middle">Bunny with 1 light ray (importance sampling).</figcaption>
+                        </td>
+                        <td align="middle">
+                            <img src="images/CBbunny_1_4_p3.png" width="480px" />
+                            <figcaption align="middle">Bunny with 4 light rays (importance sampling).</figcaption>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="middle">
+                            <img src="images/CBbunny_1_16_p3.png" width="480px" />
+                            <figcaption align="middle">Bunny with 16 light rays (importance sampling).</figcaption>
+                        </td>
+                        <td align="middle">
+                            <img src="images/CBbunny_1_64_p3.png" width="480px" />
+                            <figcaption align="middle">Bunny with 64 light rays (importance sampling).</figcaption>
+                        </td>
+                    </tr>
+                </table>
+        </div>
+
+        <h2 align="middle">Part 4 Global Illumination</h2>
+            <p>In order to implement global illumination, we need to calculate light bouncing around in a scene. zero_bounce_radiance just returns the emission 
+                of an intersection, which is black unless the point is a light. one_bounce_radiance returns a direct illumination (hemisphere or importance) depending 
+                on the boolean direct_hemisphere_sample. For our at_least_one_bounce_radiance we first get the sample from the given isect's bsdf and we check if the pdf 
+                is greater than 0. We then check if we do not terminate (despite it being called terminate) or if the max_ray_depth is greater than 1. 
+                If so, we create a ray with its origin at hit_p + EPS_D * o2w * w_in and direction at o2w * w_in with a depth of the given ray's depth minus 1. If the ray intersects the bvh 
+                we then check if the ray's depth is less than the max_ray_depth we don't do anything, but if it isn't we accumulate in L_out a recursive call to at_least_one_bounce_radiance 
+                with our constructed ray and intersection multiplied by the bsdf of the original intersection, multiplied by the angle (cos_theta(wi)) and divided by the pdf and termination chance. 
+                <p>
+               
+                        <div align="center">
+                            <table style="width=100%">
+                                <tr>
+                                    <td align="middle">
+                                        <img src="images/bunnyp42.png" width="480px" />
+                                        <figcaption align="middle">Bunny with direct and indirect lighting at 1024 samples per pixel.</figcaption>
+                                    </td>
+                                    <td align="middle">
+                                        <img src="images/spheresp42.png" width="480px" />
+                                        <figcaption align="middle">Spheres with direct and indirect lighting at 1024 samples per pixel.</figcaption>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="middle">
+                                        <img src="images/spheresp4direct.png" width="480px" />
+                                        <figcaption align="middle">Spheres with direct lighting only at 1024 samples per pixel.</figcaption>
+                                    </td>
+                                    <td align="middle">
+                                        <img src="images/spheresp4indirect.png" width="480px" />
+                                        <figcaption align="middle">Spheres with indirect lighting only at 1024 samples per pixel.</figcaption>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="middle">
+                                        <img src="images/bunnyp4d0.png" width="480px" />
+                                        <figcaption align="middle">Bunny with max_ray_depth 0.</figcaption>
+                                    </td>
+                                    <td align="middle">
+                                        <img src="images/bunnyp4d1.png" width="480px" />
+                                        <figcaption align="middle">Bunny with max_ray_depth 1.</figcaption>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="middle">
+                                        <img src="images/bunnyp4d2.png" width="480px" />
+                                        <figcaption align="middle">Bunny with max_ray_depth 2.</figcaption>
+                                    </td>
+                                    <td align="middle">
+                                        <img src="images/bunnyp4d3.png" width="480px" />
+                                        <figcaption align="middle">Bunny with max_ray_depth 3.</figcaption>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="middle">
+                                        <img src="images/bunnyp4d100.png" width="480px" />
+                                        <figcaption align="middle">Bunny with max_ray_depth 100.</figcaption>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="middle">
+                                        <img src="images/spheresp4s1.png" width="480px" />
+                                        <figcaption align="middle">Spheres with 4 light rays with 1 samples per pixel.</figcaption>
+                                    </td>
+                                    <td align="middle">
+                                        <img src="images/spheresp4s2.png" width="480px" />
+                                        <figcaption align="middle">Spheres with 4 light rays with 2 samples per pixel.</figcaption>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="middle">
+                                        <img src="images/spheresp4s4.png" width="480px" />
+                                        <figcaption align="middle">Spheres with 4 light rays with 4 samples per pixel.</figcaption>
+                                    </td>
+                                    <td align="middle">
+                                        <img src="images/spheresp4s8.png" width="480px" />
+                                        <figcaption align="middle">Spheres with 4 light rays with 8 samples per pixel.</figcaption>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="middle">
+                                        <img src="images/spheresp4s16.png" width="480px" />
+                                        <figcaption align="middle">Spheres with 4 light rays with 16 samples per pixel.</figcaption>
+                                    </td>
+                                    <td align="middle">
+                                        <img src="images/spheresp4s64.png" width="480px" />
+                                        <figcaption align="middle">Spheres with 4 light rays with 64 samples per pixel.</figcaption>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="middle">
+                                        <img src="images/spheresp4s1024.png" width="480px" />
+                                        <figcaption align="middle">Spheres with 4 light rays with 1024 samples per pixel.</figcaption>
+                                    </td>
+                                </tr>
+                            </table>
+        </div>
+        <h2 align="middle">Part 5 Adaptive Sampling</h2>
+            <p>In the case where ns_aa is equal to 1, we set our sampleCountBuffer at x + y * framebuffer.w to 1. In the case ns_aa > 1, we calculate the 
+                est_radiance_global_illumination of the ray we created in part 1. We also keep a running counter of how many samples we have in a variable called 
+                counter. We also accumulate the illums of the est_radiance_global_illumination in s1 and the illums squared in s2. We check if our counter modded by the 
+                samplesPerBatch is equal to 0. We then calculate the mean as s1 / counter and our variance as 1 over our counter minus 1 and multiply this quantity by 
+                s2 minus the quantity s1 squared over counter. We calculate I by multiplying 1.96 times the quantity square root of our variance over square root of 
+                counter. We then check if I is less than or equal to our mean times the maxTolerance. If so we accumulate the radiance in the running sum from part 1, divide 
+                by the counter, and return the sum. We then set the sampleCountBuffer at x + y * framebuffer.w to be counter. Outside the for loop iterating over the num_samples 
+                we just set sampleCountBuffer at x + y * framebuffer.w to be num_samples.<p>
+    <div align="center">
+        <table style="width=100%">
+            <tr>
+                <td align="middle">
+                    <img src="images/bunnyp5.png" width="480px" />
+                    <figcaption align="middle">Bunny at 2048 pixels, 1 sample per light, and a max ray depth of 5.</figcaption>
+                </td>
+                <td align="middle">
+                    <img src="images/bunnyp5_rate.png" width="480px" />
+                    <figcaption align="middle">Sampling rate image.</figcaption>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+</body>
+</html>
+
+
+
+

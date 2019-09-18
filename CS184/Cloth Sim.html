@@ -1,0 +1,398 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>CS 184 Mesh Editor</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+
+
+<body>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2019</h1>
+<h1 align="middle">Project 4: Cloth Simulator</h1>
+<h2 align="middle">Christopher Yun, CS184</h2>
+
+<br><br>
+
+    <div>
+
+        <h2 align="middle">Overview</h2>
+        <p>In this project, we implemented the neccesary components to simulate cloth. We first created the points and springs necessary for a grid that acts as the 
+        realistic skeleton of our cloth, with physics such as gravity and spring force being applied. After we created this grid, we applied the actual forces 
+        of gravity and spring behvaiour. We also implemented Verlet integration to see where the positions of each point would be, and we constrained these new 
+        positions using deformation constraints from the 1995 Provot paper. We then simulated collisions with objects such as spheres and planes and made sure to 
+        reposition our points on the cloth upon collision. We then implemented self collision and repositioned them there as well. Finally, we implemented shaders 
+        such as Blinn-Phong and bump mapping and displacement mapping to finish off our project.</p>
+
+        <h2 align="middle">Part I: Masses and springs</h2>
+        <p>
+            For part 1, we create a grid of point masses and springs. I first check if the orientation of the cloth is horizontal or vertical, and then I
+            create a PointMass with the appropriate coordinates based on the distance between each point in the grid based on width. For every row, we then increase
+            the y value and reset the x value to 0. If the orientation is horizontal the y is 1, and if it's vertical then we generate a random
+            z coordinate between -.001 and .001 and after the appropriate PointMass is created, we place it in our array. After creating the array of point masses,
+            we go back into it and pin the appropriate point masses using the pinned vector to index. We then go through every PointMass and we create structural,
+            shearing, and bending constraints (springs and their types) based on whether there are point masses to the immediate left and above, diagonal upper left and diagonal upper right,
+            and two to the left and two above respectively.
+        </p>
+
+        <div align="center">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                        <img src="images/p1_wireframe.png" width="480px" />
+                        <figcaption align="middle">Clear shot of the wireframe.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p1_no_shearing.png" width="480px" />
+                        <figcaption align="middle">No shearing contraints.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p1_only_shearing.png" width="480px" />
+                        <figcaption align="middle">Only shearing constraints.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p1_all_constraints.png" width="480px" />
+                        <figcaption align="middle">All constraints.</figcaption>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <h2 align="middle">Part II: Simulation via numerical integration</h2>
+        <p>
+            For part 2, we want to simulate physics on each PointMass, so we first reset the forces acting on each to 0. Next for each mass we apply the
+            formula F = ma on them to simulate gravity. Next we calculate the spring forces acting on each PointMass, so for each spring we check if it is of
+            type structural, shearing, or bending and then calculate Hooke's Law Fs = ks * (magnitude(pm_a - pm_b) -rest_length). We then see if we did pm_b - pm_a
+            for finding our vector, or vice versa, and if we did pm_b - pm_a then we add Fs to pm_a and subtract it from pm_b and the opposite occurs if we did pm_a - pm_b.
+            Then for every PointMass, we find its new positino using Verlet integration, or the formula new position = curr_position + (1 - damping) * (curr_position - old_position)
+            + curr_acceleration * timestep * timestep. We set the new position to the result of this equation and set the old position to be the former current position.
+            Finally, we do not want the postion of each PointMass to be more than 10% of its rest length in each timestep, so we go through every spring and check
+            its point masses' distance. If it exceeds the aforementioned length, we check if both masses are not pinned, if so we then change each to meet halfway such that
+            their postions are within acceptable bounds. If either is pinned, we apply the full correction to the non-pinned PointMass.
+        </p>
+
+        <p>
+            In our simulation, with a very low ks our cloth seems to ripple more and it seems to fold more as it falls into its place. With a high ks it almost
+            seems as if there is one fluid wave of motion that dispereses throughout the cloth as it falls. With a low density, the cloth resembles tissue paper as it falls,
+            almost like it's being blown by the wind. With a high density, the cloth seems to fall straight like each mass is made of rock. With a low damping, the cloth
+            falls at a regular rate and seems to resemble real life, but at a high damping it falls slowly and the forces don't seemed to be applied as much. It is like
+            bullet time in the Matrix.
+        </p>
+
+        <div align="center">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                        <img src="images/p2_low_ks.png" width="480px" />
+                        <figcaption align="middle">Wireframe with low ks.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p2_high_ks.png" width="480px" />
+                        <figcaption align="middle">Wireframe with high ks.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p2_low_density.png" width="480px" />
+                        <figcaption align="middle">Wireframe with low density.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p2_high_density.png" width="480px" />
+                        <figcaption align="middle">Wireframe with high density.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p2_low_damping.png" width="480px" />
+                        <figcaption align="middle">Wireframe with low damping.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p2_high_damping.png" width="480px" />
+                        <figcaption align="middle">Wireframe with high damping.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p2_finalrest.png" width="480px" />
+                        <figcaption align="middle">Cloth at rest.</figcaption>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <h2 align="middle">Part III: Handling collisions with other objects</h2>
+        <p>
+            For spheres, we first check if the (position - origin).norm() <= radius, because if it is then we know our PointMass is inside the sphere.
+            If this is true, then we set our tangent point to be the previous vector normalized times the radius, and add it to the origin to get our point
+            on the sphere we intersect at. We us the PointMass's last_position and subtract it from the tanget point to find the correction vector. Our position
+            for out PointMass is the last_position + (1 - friction) * correction vector. For intersecting a plane, we can tell if it intersects by checking the dot
+            product of last_position and the normal times the dot product of the position and normal. If it is less than 0, we know we intersect because this is the only
+            way a straight line can pierce the plane mathematically speaking. We then calculate the tangent point to be last_position + (dot(point_defining_plane - position, normal) / dot(position - last_position, normal) - SURFACE_OFFSET) * (position - last_position).
+            The rest of the calculations are the same as in sphere intersection. Finally, we go back to our simulate function and call collide on every PointMass
+            with every collision object.
+
+        </p>
+
+        <p>
+            With a larger and larger ks, our cloth seems to almost shorten in length as it drapes over the sphere. The cloth is less "loose", and it is more
+            "tight" at higher ks it seems.
+        </p>
+
+        <div align="center">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                        <img src="images/p3_ks_500.png" width="480px" />
+                        <figcaption align="middle">Cloth with a ks of 500.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p3_ks_5000.png" width="480px" />
+                        <figcaption align="middle">Cloth with a ks of 5000.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p3_ks_50000.png" width="480px" />
+                        <figcaption align="middle">Cloth with a ks of 50000.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p3_plane.png" width="480px" />
+                        <figcaption align="middle">Cloth at rest on plane.</figcaption>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <h2 align="middle">Part IV: Handling self-collisions</h2>
+        <p>
+            We first implement our hash_position function, which defines a 3D box of size w * h * t. Where w = 3.0 * width / num_width_points, h =
+            3.0 * height / num_height_points, and t = max(w, h). We then take the floor of the position for x, y, and z where each is divided by w, h, or t
+            respectively in its float operation. We then multiply the result of each floor by w, h, or t respectively and assign a unique flaot by multiplying
+            each coordinate by a prime number and adding them all together. We then implement build_spatial_map, which build a hash table and uses hash_position to
+            assign each PointMass to a 3D box if it exists in the table, or creates one otherwise and assigns the PointMass. Every 3D box is a vector of PointMass
+            pointers. Next we implement self_collide, which takes in a PointMass. We check if a 3D box for it exists, if so we grab the box and for every PointMass in
+            the box we check if they and the given PointMass are less than 2 * thickness apart. If they are, the correction vector is the (candidate_position - position).normalize()
+            * (distance(candidate_position - position) - (2 * thickness)). We accumulate the correction vector in a final vector and average it at the very end and
+            add it to the given PointMass's position. We then call self_collide in simulate on every PointMass.
+        </p>
+
+        <p>
+            When our cloth has a low ks, it has more wrinkles and folds more into itself, whereas at a high ks, it seems to fold only a few big times and
+            few wrinkles. Similar results occur with a high and low density respectively, with high density having many wrinkles and seeming to fall into itself
+            because of the increased density and thus mass to volume ratio and low looking almost like a light wind could tear up the cloth or blow it away.
+        </p>
+
+        <div align="center">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                        <img src="images/p4_pic1.png" width="480px" />
+                        <figcaption align="middle">Cloth falling first pic.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p4_pic2.png" width="480px" />
+                        <figcaption align="middle">Cloth falling second pic.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p4_pic3.png" width="480px" />
+                        <figcaption align="middle">Cloth falling third pic.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p4_pic4.png" width="480px" />
+                        <figcaption align="middle">Cloth falling fourth pic.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p4_low_ks1.png" width="480px" />
+                        <figcaption align="middle">Cloth with low ks pic 1.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p4_low_ks2.png" width="480px" />
+                        <figcaption align="middle">Cloth with low ks pic 2.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p4_low_ks3.png" width="480px" />
+                        <figcaption align="middle">Cloth with low ks pic 3.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p4_low_ks4.png" width="480px" />
+                        <figcaption align="middle">Cloth with low ks pic 4.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p4_high_ks1.png" width="480px" />
+                        <figcaption align="middle">Cloth with high ks pic 1.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p4_high_ks2.png" width="480px" />
+                        <figcaption align="middle">Cloth with high ks pic 2.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p4_high_ks3.png" width="480px" />
+                        <figcaption align="middle">Cloth with high ks pic 3.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p4_high_ks4.png" width="480px" />
+                        <figcaption align="middle">Cloth with high ks pic 4.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p4_higher_density1.png" width="480px" />
+                        <figcaption align="middle">Cloth with high density pic 1.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p4_higher_density2.png" width="480px" />
+                        <figcaption align="middle">Cloth with high density pic 2.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p4_higher_density3.png" width="480px" />
+                        <figcaption align="middle">Cloth with high density pic 3.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p4_higher_density4.png" width="480px" />
+                        <figcaption align="middle">Cloth with high density pic 4.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p4_low_density1.png" width="480px" />
+                        <figcaption align="middle">Cloth with low density pic 1.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p4_low_density2.png" width="480px" />
+                        <figcaption align="middle">Cloth with low density pic 2.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p4_low_density3.png" width="480px" />
+                        <figcaption align="middle">Cloth with low density pic 3.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p4_low_density4.png" width="480px" />
+                        <figcaption align="middle">Cloth with low density pic 4.</figcaption>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <h2 align="middle">Part V: Shaders</h2>
+        <p>
+            For part 5 for diffuse shading, we simply set the out_color to be the kd * (light_intensity / distance(light_pos, frag_pos)^2) * max(0, dot(normal, normalize(light_pos - frag_pos))).
+            For Blinn-Phong shading, we implement the formula ka * u_color + kd * (light_intensity / (distance * distance)) * max(0, dot(normal, normalize(u_light_pos - frag_pos))) + ks * (light_intensity / (distance * distance)) * pow(max(0, dot(normal, h)), p).
+            h is the normalize((light_pos - frag_pos) + (cam_pos - frag_pos)). For ka, kd, ks, and p, we define them until we achieve a desirable effect. We set
+            the out_color to be the previously calculated result. For the texture mapping, we simply set the out_color to be the sample we get from sampling our texture
+            at a set of uv coordinates. For bump mapping, we implement TBN = [t b n], where b is the cross product of the tangent and normal given to us. We also do
+            dU = (h(u + 1/w, v) − h(u, v)) ∗ k​h ∗ k​n, and dV = (h(u, v + 1/h) − h(u, v)) ∗ k​h ∗ k​n, since the negation of these 2 are the first two components of the
+            local space normals (along with 1 as the last component). Call this normal n0. Note, h(u, v) is a helper function that sampels our texture at the uv coordinates
+            and we use the r channel from the returned sample. Our displaced model space normal is then TBN * n0, and we use this in Blinn-Phong
+            as the normal and thus bump mapping is complete. For displacement mapping, we changed the actual vertex position so that
+            new_pos = old_pos + n ∗ h(u, v) ∗ kh, and we then apply u_model to this to put it in world space. For the gl_position, we do this first transformation
+            and also apply u_view_projection to put it into screen space. For mirror shading, we simply calculate the ray to the eye, reflect it, then get a sample from
+            the given texture using the resulting vec3 from the reflection.
+
+        </p>
+
+        <p>
+            A shader program is a program that takes in data such as vertices and fragments, and transforms them using equations to simulate lighting
+            effects as well as other special effect. In simple terms, Blinn-Phong shading works by taking in a position of a fragment and using it as well as
+            a normal and uv coordiantes to simulate specular effects. We create an ambient, diffuse, and specular component of light for the fragment using math
+            and simulate lighting. When we do bump mapping and displacement on the sphere and cloth, the bump mapping gives an illusion of detail on its surface.
+            However, displacement actually changes vertex locations to be consistent with a height map, so the surface itself actually changes. With different "coarseness",
+            we can see on our displacement spheres that the higher the resolution, the more spherical the shape.
+        </p>
+
+        <div align="center">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                        <img src="images/p5_ka_ia.png" width="480px" />
+                        <figcaption align="middle">Ambient component of Blinn-Phong only.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p5_kd.png" width="480px" />
+                        <figcaption align="middle">Diffuse component of Blinn-Phong only.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p5_ks.png" width="480px" />
+                        <figcaption align="middle">Specular component of Blinn-Phong only.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p5_phong.png" width="480px" />
+                        <figcaption align="middle">Blinn-Phong image.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p5_custom_texture.png" width="480px" />
+                        <figcaption align="middle">Custom texture.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p5_bump_cloth.png" width="480px" />
+                        <figcaption align="middle">Bump mapping cloth.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p5_bump_sphere.png" width="480px" />
+                        <figcaption align="middle">Bump mapping sphere.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p5_displacement_sphere.png" width="480px" />
+                        <figcaption align="middle">Displacement mapping on sphere.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p5_low_coarse.png" width="480px" />
+                        <figcaption align="middle">Displacement mapping with -o and -a at 16.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p5_high_coarse.png" width="480px" />
+                        <figcaption align="middle">Displacement mapping with -o and -a at 128.</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="middle">
+                        <img src="images/p5_mirror_cloth.png" width="480px" />
+                        <figcaption align="middle">Mirror shading on cloth.</figcaption>
+                    </td>
+                    <td align="middle">
+                        <img src="images/p5_mirror_sphere.png" width="480px" />
+                        <figcaption align="middle">Mirror shading on sphere.</figcaption>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div></body>
+</html>

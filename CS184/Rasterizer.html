@@ -1,0 +1,237 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>CS 184 Rasterizer</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+
+
+<body>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2019</h1>
+<h1 align="middle">Project 1: Rasterizer</h1>
+<h2 align="middle">Christopher Yun, CS184-??</h2>
+
+<br><br>
+
+<div>
+
+<h2 align="middle">Overview</h2>
+<p>Give a high-level overview of what you implemented in this project. Think about what you've built as a whole. Share your thoughts on what interesting things you've learned from completing the project.</p>
+
+<h2 align="middle">Section I: Rasterization</h2>
+
+<h3 align="middle">Part 1: Rasterizing single-color triangles</h3>
+
+<p>
+    In order to rasterize a triangle, you must first check every possible pixel inside the triangle. To do this, you conduct point in triangle test,
+    which checks if a point is on the inside of a triangle by checking where the point is relative to the triangle's three lines. We then color
+    the pixel if it is inside all 3. Our algorithm is no worse than one that checks each sample within the bounding box of the triangle
+ because we form a box by finding the smallest x and y coordinates and then checking every point from these to the max x and y coordinates, 
+forming a bounding box, which we then checked in drawend.cpp if we should color or not.</p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/part1.png" align="middle" width="400px"/>
+        <figcaption align="middle">Part 1 image with pixel zoom on red part.</figcaption>
+      </td>
+  </table>
+</div>
+
+
+<h3 align="middle">Part 2: Antialiasing triangles</h3>
+    <p>In order to implement supersampling, we needed to start going through sub pixels. For each pixel, we went through the subpixels in order to average
+    our RGB values in order to determined the final color. So besides forming the bounding box as before, for each pixel we need to find the center of 
+    each sub pixel, so the math is the x plus the sub pixel / the square root of the sample rate plus 1 / 2 * square root of sample rate. The same math applies
+    to y to get the center of each subpixel, which we then compute the point in tests of part 1 and then color accordingly. Super sampling is useful because it
+    partially colors pixels and form smoother lines, thus helping eliminate jaggies and this acts as antialiasing. </p>
+
+    <div align="middle">
+        <table style="width=100%">
+            <tr>
+                <td>
+                    <img src="images/part2sample1.png" align="middle" width="400px" />
+                    <figcaption align="middle">Part 1 image with sample rate of 1.</figcaption>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <img src="images/part2sample4.png" align="middle" width="400px" />
+                    <figcaption align="middle">Part 1 image with sample rate of 4.</figcaption>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <img src="images/part2sample16.png" align="middle" width="400px" />
+                    <figcaption align="middle">Part 1 image with sample rate of 16.</figcaption>
+                </td>
+            </tr>
+        </table>
+</div>
+
+
+<h3 align="middle">Part 3: Transforms</h3>
+    <p>I tried making my robot experience the balancing act of life. Besides that, we created the 3x3 matrices that result in the proper translations. 
+        So for scaling, if you have a vector of (a,b,1), and then you want to scale by x and y, our current matrix multiplication results in 
+        (ax, by, 1). Using the same variable names, 
+        translating results in (a + x, b + y, 1) and rotating results in (a * cos (x) - b * sin(x), a * sin (x) + b * cos(x), 1). These are all the
+        correct transformations.<p>
+        <div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="my_robot.svg" align="middle" width="400px"/>
+        <figcaption align="middle">Dancing robot.</figcaption>
+      </td>
+  </table>
+</div>
+
+
+<h2 align="middle">Section II: Sampling</h2>
+
+<h3 align="middle">Part 4: Barycentric coordinates</h3>
+    <p> Barycentric coordinates are coordinates used to interpolate between different vectors, colors, etc. So alpha, beta, and gamma are the points of 
+    a triangle in barycentric coordinates. So if we are using colors in the triangle below, alpha can be red, beta can be green, and gamma can be blue. And our coordinate is 
+    a value residing somewhere in or along the triangle. The higher the value for alpha, beta, gamma, the close they are to their respective vertices. 
+    So first we calculate alpha, beta, and gamma in rasterize_triangle by converting the x and y coordinates using the formula in the slides, we now
+    want a new color so we pass on these coordinates as a Vector3D tri->color and inside tri->color we find the barycentric coordinate by doing alpha * 
+    po_col + beta * p1_col + gamma * p2_col, and we then return a new color based on that coordinate.</p>
+    <div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/part4triangle.png" align="middle" width="400px"/>
+        <figcaption align="middle">Triangle to help explain barycentric coordinates.</figcaption>
+      </td>
+  </table>
+</div>
+        <div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/part4wheel.png" align="middle" width="400px"/>
+        <figcaption align="middle">Color wheel.</figcaption>
+      </td>
+  </table>
+</div>
+<h3 align="middle">Part 5: "Pixel sampling" for texture mapping</h3>
+    <p>Pixel sampling is the process of checking a pixel to see if its inside a triangle to raterize. We want to eventually get UV coordinates so we 
+    first calculate the barycentric coordinates for x and y and fill in sp.p_uv. We then call tex->sample and either sample the nearest point or do bilinear
+    sampling pased on the pixel sample method they pass to us. In both we need to scale the u and v coordinates by width and height to find the correct location 
+    on the texture. Nearest pixel sampling simply finds the closest pixel center and returns the color in the texels
+    array which corresponds to the color at the location on the texture. Bilinear sampling finds the four closest pixel centers to the uv coordinates we have,
+     and we do this by flooring and ceiling the uv values. We then find the points above and below the uv coordinates and then we interpolate between these points, 
+    u0 and u1, and the vertical distance between u1 and the point. This all results in a color that is intermediate and thus smoothes out better than nearest sampling.</p>
+  <div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p5nearestsample1.png" align="middle" width="400px"/>
+        <figcaption align="middle">Using nearest sampling, sample rate is 1.</figcaption>
+      </td>
+  </table>
+</div>
+  <div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p5nearestsample16.png" align="middle" width="400px"/>
+        <figcaption align="middle">Using nearest sampling, sample rate is 16.</figcaption>
+      </td>
+  </table>
+</div>
+  <div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p5bilinearsample1.png" align="middle" width="400px"/>
+        <figcaption align="middle">Using bilinear sampling, sample rate is 1.</figcaption>
+      </td>
+  </table>
+</div>
+      <div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p5bilinearsample16.png" align="middle" width="400px"/>
+        <figcaption align="middle">Using bilinear sampling, sample rate is 16.</figcaption>
+      </td>
+  </table>
+</div>
+<h3 align="middle">Part 6: "Level sampling" with mipmaps for texture mapping</h3>
+    <p>Level sampling is a concept that since different areas of an image work better or worse at different resolutions, we sample at multiple levels 
+    and average out the values at each pixel so that even if certain parts of the image become blurrier, we smooth out jaggies and thus antialias across
+    the entire image. For our project, we implemented this by calling sample_nearest and sample_bilinear on certain levels of the mipmap and then interpolating values 
+    between the levels. If we did not calculate the exact mipmap level, we just called sample_nearest or sample_bilinear on the nearest mipmap level and hoped it eliminated jaggies without interpolating
+    between multiple levels. Within rasterize_triangle, we found the alpha, beta, and gamma values for our dxs and dys, and then calculated the barycentric coordinates 
+    for them in tri->color. We then go into texture and use those to fill in the equation for L, which is the max between the square root of (du/dx)^2 + (dv/dx)^2 and the square root of 
+    (du/dy)^2 + (dv/dy)^2. We then find the final level by taking the log2 of L. For whenever the lsm was L_Linear, we found the floor of level D and the ceil of level D,
+    and then we got the colors from both and interpolated.</p>
+
+    <p>Using bilinear pixel sampling eliminates jaggies because of the average values produced by bilinear calculations, but this process takes alot longer 
+        because you have to do many more calculations per pixel, or 4 texel reads and 3 lerps. For level sampling, level sampling at 0 is the fastest, sampling 
+        at nearest is in the middle, and sampling between levels is the longest because of calculations made. Level sampling with trilinear interpolation also takes up
+        about 1/3 more memory than the original image. The same idea of speed goes for supersampling. However, for certain images with repeating values in proximity, 
+        level sampling at a linear level will make the image blurry because of the averaging that happens across the image (known as moire), and thus a combination supersampling sizes, pixel sampling methods, 
+        and level sampling methods is needed for individual images to determine the optimal combination.<p>
+      <div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p6zeronear.png" align="middle" width="400px"/>
+        <figcaption align="middle">Using 0th mipmap, using nearest pixel sampling.</figcaption>
+      </td>
+  </table>
+</div>
+  <div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p6zerobilinear.png" align="middle" width="400px"/>
+        <figcaption align="middle">Using 0th mipmap, using bilinear pixel sampling.</figcaption>
+      </td>
+  </table>
+</div>
+  <div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p6nearnear.png" align="middle" width="400px"/>
+        <figcaption align="middle">Using nearest mipmap level, using nearest pixel sampling.</figcaption>
+      </td>
+  </table>
+</div>
+      <div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/p6nearbilinear.png" align="middle" width="400px"/>
+        <figcaption align="middle">Using nearest mipmap level, using bilineear pixel sampling.</figcaption>
+      </td>
+  </table>
+</div>
+
+<h2 align="middle">Section III: Art Competition</h2>
+<p>If you are not participating in the optional art competition, don't worry about this section!</p>
+
+<h3 align="middle">Part 7: Draw something interesting!</h3>
+
+</body>
+</html>

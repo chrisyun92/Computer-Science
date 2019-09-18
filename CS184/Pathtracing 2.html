@@ -1,0 +1,247 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>  
+    div.padded {  
+      padding-top: 0px;  
+      padding-right: 100px;  
+      padding-bottom: 0.25in;  
+      padding-left: 100px;  
+    }  
+  </style> 
+<title>Christopher Yun  |  CS 184</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" href="style.css" media="screen" />
+</head>
+<body>
+<br />
+<h1 align="middle">Assignment 3: PathTracer</h1>
+    <h2 align="middle">Christopher Yun</h2>
+
+    <div class="padded">
+            <p>In prohect 3-2, we create and do a larger amount of calculations in order to accurately represent materials and reflection and the general 
+        movement of light through materials. We first implement the math for reflection and refraction, as well as the behaviour of the BSDF of glass. We then 
+        create a model to implement microfacet materials by using the microfacet BRDF, the normal distribution function, the Fresnel term, and importance sampling. 
+        We create an infinite environment light that uses both uniform and importance sampling. For the latter we have to find the pdf and marginal and conditional 
+        distributions. Finally, we implement a thin-lens camera model in place of a pinhole camera so we have focus and blur and utilize aperture and focal distance.</p>
+
+            <h2 align="middle">Part 1: Mirror and Glass</h2>
+            <p>In order to do part 1, we implement reflect using the perfect specularreflection equation which is wi = -1.0 * wo + (2.0 * dot(wo, n) * n), where n is the 
+            normal vector. Next for MirrorBSDF::sample_f, we simply set the pdf to 0 and reflect the wo vector and return the reflectance over the absoulte 
+            cosine of the resulting vector from the reflection. For refraction, we first check our wo's z value. If it is positive we are entering a material 
+            and vice versa and set our new index of refraction (eta) accordingly to 1 over the ior of the material. Next we check if there is total internal reflection, 
+            or if the material traps light completely by checking if (1 - eta^2) * (1 - cos(wo)^2) < 0. If this is true we simply return since there is no refraction, otherwise 
+            we set the resulting vector's (wi's) xyz values to be -eta * wo.x, -eta * wo.y, and sqrt((1 - eta^2) * (1 - wo.z^2)). The z value of wi is the opposite symbol of 
+            wo.z. For a glass material, we first check if theres total internal reflection and if so we reflect(wo, *wi) and set the pdf to 1, then we return the reflectance 
+            over the absolute cosine of wi. If there is not total internal reflection, we computer Slick's approximation's R using R0 = ((n1 - n2) / (n1 + n2))^2. And R = 
+            R0 + (1 - R0) * (1 - abs_cos(*wo))^5. Next we flip a coin with chance R, and if it is true then we set the pdf to be R, reflect(wo, *wi), and return the 
+            same value as if there was total internal reflection but multiplied by R. If the coin flip doesn't go through, we refract(wo, *wi), set the pdf to be 1 - R, and return
+            (1-R) * transmittance / abs_cos_theta(*wi) / eta^2, where eta is the same as before.</p>
+
+            <p>When we start with a ray depth of 0, we have no image because there is no light bouncing. When the ray depth becomes 1, the walls appear and the 
+            spheres are black because they are clear and they do not reflect the light with only one bounce yet. The walls reflect their colors and properties. 
+            When the max ray depth becomes 2, the sphere on the left starts to reflect light because with two bounces light can hit the sphere and go off to the 
+            camera. The sphere on the right has light that enters and doesn't leave. It reflects on its surface, but it is not refracting properly yet. When the 
+            max ray depth becomes 3, the sphere on the right is no longer black because the light entering the sphere leaves in a new angle. The reflection on the 
+            sphere "reflects" this hue hue hue. When max ray depth becomes 4, the light appears on the ground because now with more bounces inside the sphere on the 
+            right, more light exits the sphere and it acts like a magnifying glass with the light source. When the max ray depth becomes 5, a light appears on the wall 
+            from the refraction sphere because more bounces allow more light to leave. When the max ray depth becomes 100, the light on the wall appears to become softer 
+            because with more bounces less light is trapped on the wall.</p>
+            <div align="center">
+                <table style="width=100%">
+                    <tr>
+                        <td align="middle">
+                            <img src="images/spheres_depth_0.png" width="480px" />
+                            <figcaption align="middle">CBspheres with 64 samples per pixel, 4 samples per light, max ray depth 0.</figcaption>
+                        </td>
+                        <td align="middle">
+                            <img src="images/spheres_depth_1.png" width="480px" />
+                            <figcaption align="middle">CBspheres with max ray depth 1.</figcaption>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="middle">
+                            <img src="images/spheres_depth_2.png" width="480px" />
+                            <figcaption align="middle">CBspheres with max ray depth 2.</figcaption>
+                        </td>
+                        <td align="middle">
+                            <img src="images/spheres_depth_3.png" width="480px" />
+                            <figcaption align="middle">CBspheres with max ray depth 3.</figcaption>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="middle">
+                            <img src="images/spheres_depth_4.png" width="480px" />
+                            <figcaption align="middle">CBspheres with max ray depth 4.</figcaption>
+                        </td>
+                        <td align="middle">
+                            <img src="images/spheres_depth_5.png" width="480px" />
+                            <figcaption align="middle">CBspheres with max ray depth 5.</figcaption>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="middle">
+                            <img src="images/spheres_depth_100.png" width="480px" />
+                            <figcaption align="middle">CBspheres with max ray depth 100.</figcaption>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <h2 align="middle">Part 2: Microfacet Materials</h2>
+            <p>
+                For part 2, we calculate f = (F(wi) * G(wo, wi) * D(h)) / (4.0 * dot(n, wo) * dot(n, wi)), where h is (wo + wi).unit(). D(h) is exp(-1.0 * tan(getTheta(h)^2) / alpha^2) /
+                (PI * alpha^2 * cos_theta(h)^4), F is (Rs + Rp) / 2 or the Fresnel term for each R,G,B channel. We then do importance sampling for the microfacet BRDF using the 
+                Beckmann normal distribution function.<p>
+
+            <p>When the alpha is at 0.005, the image is a darkened dragon and the reason is because our pdf is smaller and the light reflects 
+            more of a metallic surface than other images, like a mirror. When the alpha is 0.05, the dragon starts to have diffuse properties as well as reflective properties so 
+            in some sense it looks shinier than the first one even if it isn't. The colors and surface texture are coming in. At the alpha set to 0.25, we see the gold color of the dragon as the microfacets increase in their 
+            differences at the "peaks" of each surface, or in other words as the material becomes rougher, and the dragon becomes less specular because of it's materials properties. At 
+            alpha at 0.5, the material has the reflection of a realistic object in the world and diffuses its color accordingly. </p>
+            
+            <p>For the bunnies using cosine hemisphere sampling and importance sampling, the one with importance sampling has less noise and reflects and diffuses 
+                more accurately than the other because of our implementation, as previously explained. For the custom material, I made my parameters correspond to the spectrum 
+                of gold.<p>
+    <div align="center">
+        <table style="width=100%">
+            <tr>
+                <td align="middle">
+                    <img src="images/dragon_alpha_0005.png" width="480px" />
+                    <figcaption align="middle">Dragon with 128 samples per pixel, 1 sample per light, max ray depth 6, alpha 0.005.</figcaption>
+                </td>
+                <td align="middle">
+                    <img src="images/dragon_alpha_005.png" width="480px" />
+                    <figcaption align="middle">Dragon with alpha 0.05.</figcaption>
+                </td>
+            </tr>
+            <tr>
+                <td align="middle">
+                    <img src="images/dragon_alpha_025.png" width="480px" />
+                    <figcaption align="middle">Dragon with alpha 0.25.</figcaption>
+                </td>
+                <td align="middle">
+                    <img src="images/dragon_alpha_05.png" width="480px" />
+                    <figcaption align="middle">Dragon with alpha 0.5.</figcaption>
+                </td>
+            </tr>
+            <tr>
+                <td align="middle">
+                    <img src="images/bunny_coshemispheresampling.png" width="480px" />
+                    <figcaption align="middle">CBbunny copper with 64 samples per pixel, 1 sample per light, and 6 bounces with cosine hemisphere sampling.</figcaption>
+                </td>
+                <td align="middle">
+                    <img src="images/bunny_importancesampling.png" width="480px" />
+                    <figcaption align="middle">CBbunny copper with importance sampling.</figcaption>
+                </td>
+            </tr>
+            <tr>
+                <td align="middle">
+                    <img src="images/bunny_gold_material.png" width="480px" />
+                    <figcaption align="middle">CBbunny with gold material.</figcaption>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <h2 align="middle">Part 3: Environment Light</h2>
+    <p>For part 3, we are implementing an infinite environment light which provides rays from all directions. For the first part, we are simply converting 
+        the rays direction to xy coordinates we then bilinearly interpolate. For part 2, we get a sample randomly and set the resulting ray to be the sample. We find the 
+        radiance by bilinearly interoplating the xy converted wi. We set the light's distance to infinity and the pdf to 1/4*PI. Next we implement importance sampling 
+        because environments with alot of variation in light intensities generate alot of noise due to a bias in the energy concentration of light in real life. We 
+        first find the pdf and keep a running sum and store the radiance multiplied by sin(PI * y / h), with h being the half vector. We normalize at the end by the sum. 
+        We then find the marginal distributions by keeping a running sum and gradually setting each element in our marginal array to the running sum. We also keep 
+        an array that stores the individual pdf environment map values. For our conditional distributions, we just make the next element in each place equal to the 
+        previous element plus the pdf of the environment map value at w * h + w, or the place in the row, divided by an individual pdf environment map value from 
+        our previously created array. We then use the inversion method to calculate wi, recalculate the pdf, set the distance to the light to infinity again, 
+        and return the environment map variable at our new found x and y coordinates at (x + y * w).<p>
+    <p>I used the field exr file for both. In both the unlit and copper bunnies, the noise is much less for both the importance sampling bunnies.<p>
+    <div align="center">
+        <table style="width=100%">
+            <tr>
+                <td align="middle">
+                    <img src="images/probability_debug.png" width="480px" />
+                    <figcaption align="middle">Probability debug.</figcaption>
+                </td>
+                <td align="middle">
+                    <img src="images/unlitBunny_uniformsampling.png" width="480px" />
+                    <figcaption align="middle">Unlit bunny with uniform sampling.</figcaption>
+                </td>
+            </tr>
+            <tr>
+                <td align="middle">
+                    <img src="images/unlitBunny_importancesampling.png" width="480px" />
+                    <figcaption align="middle">Unlit bunny with importance sampling.</figcaption>
+                </td>
+                <td align="middle">
+                    <img src="images/copperBunny_uniformsampling.png" width="480px" />
+                    <figcaption align="middle">Unlit copper bunny with uniform sampling.</figcaption>
+                </td>
+            </tr>
+            <tr>
+                <td align="middle">
+                    <img src="images/copperBunny_importancesampling.png" width="480px" />
+                    <figcaption align="middle">Unlit copper bunny with importance sampling.</figcaption>
+                </td>
+                <td align="middle">
+                    <img src="images/field.jpg" width="480px" />
+                    <figcaption align="middle">field.</figcaption>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <h2 align="middle">Part 4: Depth of Field</h2>
+    <p>In project 3-1, we implemented rays and used pinhole cameras. We want to use a lens that bends light to focus on the same point on our screen as 
+        it would for a pinhole camera. Since we know how to generate the pinhole ray, we have the endpoint, and since we know where on our lens we start 
+        our new ray, we can create a new destination for our new ray that lands on the same point as that of a pinhole camera. This is what we do in part 4. A pinhole 
+        camera is different from a thin-lens camera model because light travels straight in a pinhole camera so the image is perfectly recreated on the other side 
+        of the pinhole as an upside down image. A thin-lens camera model bends light at certain angles as it goes through the hole to land on spots on the other side.<p>
+    <div align="center">
+        <table style="width=100%">
+            <tr>
+                <td align="middle">
+                    <img src="images/CBdragon_microfacet_au_fd14_aperture0044194.png" width="480px" />
+                    <figcaption align="middle">Dragon with 64 samples per pixel, 4 samples per light, and ray depth of 8 with a focal length of 1.4 and an aperture of 0.044194.</figcaption>
+                </td>
+                <td align="middle">
+                    <img src="images/CBdragon_microfacet_au_fd19_aperture0044194.png" width="480px" />
+                    <figcaption align="middle">Dragon with a focal length of 1.9 and an aperture of 0.044194.</figcaption>
+                </td>
+            </tr>
+            <tr>
+                <td align="middle">
+                    <img src="images/CBdragon_microfacet_au_fd22_aperture0044194.png" width="480px" />
+                    <figcaption align="middle">Dragon with a focal length of 2.2 and an aperture of 0.044194.</figcaption>
+                </td>
+                <td align="middle">
+                    <img src="images/CBdragon_microfacet_au_fd27_aperture0044194.png" width="480px" />
+                    <figcaption align="middle">Dragon with a focal length of 2.7 and an aperture of 0.044194.</figcaption>
+                </td>
+            </tr>
+            <tr>
+                <td align="middle">
+                    <img src="images/CBdragon_microfacet_au_fd19_aperture0022097.png" width="480px" />
+                    <figcaption align="middle">Dragon with 64 samples per pixel, 4 samples per light, and ray depth of 8 with a focal length of 1.9 and an aperture of 0.022097.</figcaption>
+                </td>
+                <td align="middle">
+                    <img src="images/CBdragon_microfacet_au_fd19_aperture0044194.png" width="480px" />
+                    <figcaption align="middle">Dragon with a focal length of 1.9 and an aperture of 0.044194.</figcaption>
+                </td>
+            </tr>
+            <tr>
+                <td align="middle">
+                    <img src="images/CBdragon_microfacet_au_fd19_aperture0125000.png" width="480px" />
+                    <figcaption align="middle">Dragon with a focal length of 1.9 and an aperture of 0.125000.</figcaption>
+                </td>
+                <td align="middle">
+                    <img src="images/CBdragon_microfacet_au_fd19_aperture0353553.png" width="480px" />
+                    <figcaption align="middle">Dragon with a focal length of 1.9 and an aperture of 0.353553.</figcaption>
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>
+
+
+
+
